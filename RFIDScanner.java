@@ -3,10 +3,15 @@ import java.net.*;
 import java.util.*;
 import java.lang.*;
 
+
 public class RFIDScanner {
 
 	String scannerId;
+	String firstName;
+	String lastName;
 	String location;
+	String type;
+	double remainingBalance;
 	double fee;
 	String server;
 
@@ -14,22 +19,6 @@ public class RFIDScanner {
 	public RFIDScanner(String sId) throws IOException {
 		scannerId = sId;
 
-		// Establish DB dataSource and connection
-		MysqlDataSource dataSource = new MysqlDataSource();
-		dataSource.setUser("suarezka");
-		dataSource.setPassword("suarezka");
-		dataSource.setServerName("mysql.cis.gvsu.edu");
-		Connection conn = dataSource.getConnection();
-		Statement stmt = conn.createStatement();
-
-		// Query DB for location and fee
-		ResultSet rs = stmt.executeQuery("SELECT ID FROM USERS");
-		
-		
-
-
-		//location = loc;
-		//fee = amt;
 		server = "localhost";
 
 		Scanner input = new Scanner(System.in);
@@ -45,13 +34,45 @@ public class RFIDScanner {
 		DataInputStream in  = new DataInputStream(socket.getInputStream());
 		DataOutputStream out = new DataOutputStream(socket.getOutputStream());
 
-		// write the location and fee amount of scanner to the server
-		out.writeUTF(location + " " + Double.toString(fee));
+		// write the scannerId to the server
+		out.writeUTF(scannerId);
 
+		// wait for card to be scanned
+		String barcode = new String("");
+		String response = new String("");
+		barcode = input.nextLine();
+		while(!barcode.equals("quit")) {
+
+			// write the scanned card's barcode to the server
+			out.writeUTF(barcode);
+
+			// read remaining balance
+			response = in.readUTF();
+			String responseVals[] = response.split("/");
+			firstName = responseVals[0];
+			lastName = responseVals[1];
+			location = responseVals[2];
+			type = responseVals[3];
+			fee = Double.parseDouble(responseVals[4]);
+			remainingBalance = Double.parseDouble(responseVals[5]);
+
+			System.out.println("---------- Summary ----------\n" + 
+				"Name:\t\t\t" + firstName + " " + lastName + "\n" +
+				"Location:\t\t" + location + " - " + type + "\n" +
+				"Charge:\t\t\t" + fee + "\n" +
+				"Remaining Balance:\t" + remainingBalance + "\n");
+
+			barcode = input.nextLine();
+		}
+		
+
+
+/*
 		// close DB connections
 		rs.close();
 		stmt.close();
 		conn.close();
+*/
 
 		// close connection socket
 		in.close();
