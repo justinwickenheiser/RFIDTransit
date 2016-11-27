@@ -22,6 +22,17 @@ public class LondonHandler extends Thread {
 		this.clientSocket = socket;
 		this.in = new DataInputStream (clientSocket.getInputStream());
 		this.out = new DataOutputStream(clientSocket.getOutputStream());
+
+		// Register JDBC Driver
+		try {
+			Class.forName("oracle.jdbc.driver.OracleDriver");
+		} catch (ClassNotFoundException ex) {
+			System.out.println("Error: unable to load driver class.");
+			// out.close();
+			// in.close();
+			// clientSocket.close();
+			// System.exit(1);
+		}
 	}
 
 	public void run() {
