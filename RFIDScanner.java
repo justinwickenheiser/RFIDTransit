@@ -64,15 +64,6 @@ public class RFIDScanner {
 
 			barcode = input.nextLine();
 		}
-		
-
-
-/*
-		// close DB connections
-		rs.close();
-		stmt.close();
-		conn.close();
-*/
 
 		// close connection socket
 		in.close();
