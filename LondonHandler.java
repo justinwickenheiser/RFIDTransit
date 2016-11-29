@@ -18,9 +18,6 @@ public class LondonHandler extends Thread {
 	String url = "jdbc:mysql://localhost:3306/datacomm";
 	String username = "wickenhj";
 	String password = "password";
-	//Statement stmt;
-
-	protected static Vector handlers = new Vector();
 
 	// Constructor
 	public LondonHandler(Socket socket) throws IOException {
@@ -42,8 +39,6 @@ public class LondonHandler extends Thread {
 			ResultSet rs = null;
 			// try connecting and receiving scanner info
 			try {
-				// Add this thread to the vector of threads
-				handlers.addElement(this);
 
 				System.out.println("\nHandling Request...\n" + 
 						"Host: " + clientSocket.getInetAddress().getHostAddress() + 
@@ -117,7 +112,7 @@ public class LondonHandler extends Thread {
 					out.writeUTF(firstName+"/"+lastName+"/"+scannerLocation+"/"+scannerType+"/"+scannerFee+"/"+balance);
 
 					// insert into CardScanner Table to indicate a "transaction"
-					String insert = "INSERT INTO CardScanner (card_id, scanner_id, entryDate) VALUES ("+cardId+", "+scannerId+", CURRENT_TIMESTAMP);";
+					String insert = "INSERT INTO CardScanner (card_id, scanner_id, entryDate, balance) VALUES ("+cardId+", "+scannerId+", CURRENT_TIMESTAMP,"+balance+");";
 					try {
 						int insertSuccess = stmt.executeUpdate(insert);
 					} catch (Exception ex) {
@@ -132,7 +127,7 @@ public class LondonHandler extends Thread {
 					// check if deadline value is zero
 					if (deadline == 0) {
 						// query for all travel history for the user since last deadline
-						String historySearch = "SELECT c.balance,s.location,s.type,s.fee,cs.entryDate FROM TransitCard c,Scanner s,CardScanner cs WHERE c.card_id = "+cardId+" AND c.card_id = cs.card_id AND cs.scanner_id = s.scanner_id ORDER BY cs.entryDate;";
+						String historySearch = "SELECT cs.balance,s.location,s.type,s.fee,cs.entryDate FROM TransitCard c,Scanner s,CardScanner cs WHERE c.card_id = "+cardId+" AND c.card_id = cs.card_id AND cs.scanner_id = s.scanner_id ORDER BY cs.entryDate;";
 						try {
 							rs = stmt.executeQuery(historySearch);
 						} catch (Exception ex) {
@@ -142,7 +137,7 @@ public class LondonHandler extends Thread {
 						
 
 						// display the history on server side to indicate "mailing" statement
-						System.out.println("Date\t\tFrom\t\tCharge\tBalance");
+						System.out.println("Date\t\tFrom\t\t\tCharge\tBalance");
 						while (rs.next()) {
 							System.out.println(rs.getDate("entryDate")+"\t"+
 								rs.getString("location")+"\t"+
@@ -173,8 +168,6 @@ public class LondonHandler extends Thread {
 					}
 				}
 
-			
-
 
 				// close database connection and statement
 				try {
@@ -186,9 +179,6 @@ public class LondonHandler extends Thread {
 					System.out.println(ex);
 				}
 
-				// remove RFIDscanner from vector
-				handlers.remove(this);
-
 				out.close();
 				in.close();
 				clientSocket.close();
@@ -197,9 +187,6 @@ public class LondonHandler extends Thread {
 			}
 		} catch (SQLException e) {
 			throw new IllegalStateException("Cannot connect the database!", e);
-			// out.close();
-			// in.close();
-			// clientSocket.close();
 		}
 	}
 
