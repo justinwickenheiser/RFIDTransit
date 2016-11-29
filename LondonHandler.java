@@ -50,21 +50,23 @@ public class LondonHandler extends Thread {
 						"\nPort: " + clientSocket.getPort());
 
 				// Get scannerId from client
-				String scannerInfo = in.readUTF();
+				String scannerId = in.readUTF();
+				String scannerQuery = "SELECT * FROM Scanner WHERE scanner_id=" + scannerId + ";";
 
 				try {
 					// Query DB for location, type, and fee
-					// ResultSet rs = stmt.executeQuery("SELECT ID FROM USERS");
+					rs = stmt.executeQuery(scannerQuery);
 				} catch (Exception ex) {
-					System.out.println("-- Query ResultSet Error");
+					System.out.println("-- Query ResultSet Error: Scanner Query");
 					System.out.println(ex);
 				}
 				
-				
-				// temp variables
-				scannerLocation = "Kings Cross";
-				scannerType = "Rail";
-				scannerFee = Double.parseDouble("2.50");
+				// Loop over the single result and save the info into variables
+				while (rs.next()) {
+					scannerLocation = rs.getString("location");
+					scannerType = rs.getString("type");
+					scannerFee = Double.parseDouble(rs.getString("fee"));
+				}
 
 
 				System.out.println("\nScanner Info:\n" + 
@@ -75,28 +77,100 @@ public class LondonHandler extends Thread {
 
 				// wait for card to be scanned
 				String barcode = new String("");
+				int cardId = -1;
+				String firstName = "";
+				String lastName = "";
+				Double balance = -1.0;
+				int deadline = -1;
 				while(!barcode.equals("quit")) {
 					barcode = in.readUTF();
 
 					// get user info by querying db on barcode
+					String barcodeQuery = "SELECT * FROM TransitCard WHERE barcode=" + barcode + ";";
+					try {
+						// Query DB for user's info
+						rs = stmt.executeQuery(barcodeQuery);
+					} catch (Exception ex) {
+						System.out.println("-- Query ResultSet Error: Barcode Query");
+						System.out.println(ex);
+					}
+
+					// Loop over the single result and save the info into variables
+					while (rs.next()) {
+						cardId = rs.getInt("card_id");
+						firstName = rs.getString("first_name");
+						lastName = rs.getString("last_name");
+						balance = Double.parseDouble(rs.getString("balance"));
+						deadline = rs.getInt("deadline");
+					}
 
 					// check to see if they have sufficient funds
 					// if not succient funds, add $10
+					if (balance - scannerFee < 0) {
+						balance += 10;
+					}
 
 					// deduct fee amount from card balance
+					balance -= scannerFee;
 
 					// write to client their name, location, type, fee charge, and remaining balance
-					out.writeUTF("Bob/Ross/Kings Cross/Rail/" + scannerFee + "/7.50");
+					out.writeUTF(firstName+"/"+lastName+"/"+scannerLocation+"/"+scannerType+"/"+scannerFee+"/"+balance);
+
+					// insert into CardScanner Table to indicate a "transaction"
+					String insert = "INSERT INTO CardScanner (card_id, scanner_id, entryDate) VALUES ("+cardId+", "+scannerId+", CURRENT_TIMESTAMP);";
+					try {
+						int insertSuccess = stmt.executeUpdate(insert);
+					} catch (Exception ex) {
+						System.out.println("-- Query Error: CardScanner Insert");
+						System.out.println(ex);
+					}
+					
 
 					// decrement the deadline value for Summary
+					deadline -= 1;
 
-					// check if deadline value is zero.
-					// if deadline == 0, 
-					// 		query for all travel history for the user since last deadline
-					//		display the history on server side to indicate "mailing" statement
-					//		delete all the user's entries in CardScanner table
-					//		reset deadline value to 5 in TransitCard table
+					// check if deadline value is zero
+					if (deadline == 0) {
+						// query for all travel history for the user since last deadline
+						String historySearch = "SELECT c.balance,s.location,s.type,s.fee,cs.entryDate FROM TransitCard c,Scanner s,CardScanner cs WHERE c.card_id = "+cardId+" AND c.card_id = cs.card_id AND cs.scanner_id = s.scanner_id ORDER BY cs.entryDate;";
+						try {
+							rs = stmt.executeQuery(historySearch);
+						} catch (Exception ex) {
+							System.out.println("-- Query Error: History Search");
+							System.out.println(ex);
+						}
+						
 
+						// display the history on server side to indicate "mailing" statement
+						System.out.println("Date\t\tFrom\t\tCharge\tBalance");
+						while (rs.next()) {
+							System.out.println(rs.getDate("entryDate")+"\t"+
+								rs.getString("location")+"\t"+
+								rs.getString("fee")+"\t"+
+								rs.getString("balance"));
+						}
+
+						// delete all the user's entries in CardScanner table
+						String delete = "DELETE FROM CardScanner WHERE card_id = " + cardId + ";";
+						try {
+							int deleteSuccess = stmt.executeUpdate(delete);
+						} catch (Exception ex) {
+							System.out.println("-- Query Error: CardScanner Delete");
+							System.out.println(ex);
+						}
+
+						// reset deadline value to 5
+						deadline = 5;
+					}
+
+					// update TransitCard entry with the new balance and deadline
+					String update = "UPDATE TransitCard SET balance='"+balance+"', deadline="+deadline+" WHERE card_id="+cardId+";";
+					try {
+						int udpateSuccess = stmt.executeUpdate(update);
+					} catch (Exception ex) {
+						System.out.println("-- Query Error: TransitCard Update");
+						System.out.println(ex);
+					}
 				}
 
 			
